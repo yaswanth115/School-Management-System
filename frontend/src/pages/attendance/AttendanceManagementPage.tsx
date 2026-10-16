@@ -99,28 +99,37 @@ export const AttendanceManagementPage: React.FC = () => {
     fetchClasses();
   }, []);
 
-  // Update sections when selectedClassId changes
+  // Update sections when selectedClassId or classes changes
   useEffect(() => {
     if (!selectedClassId) {
       setSections([]);
       setSelectedSectionId('');
       return;
     }
-    const fetchSections = async () => {
-      try {
-        const res = await apiClient.get<Section[]>(`/academics/sections?class_id=${selectedClassId}`);
-        setSections(res.data);
-        if (res.data.length > 0) {
-          setSelectedSectionId(res.data[0].id);
-        } else {
+
+    const foundClass = classes.find((c) => c.id === selectedClassId);
+    if (foundClass && foundClass.sections && foundClass.sections.length > 0) {
+      setSections(foundClass.sections);
+      setSelectedSectionId(foundClass.sections[0].id);
+    } else {
+      const fetchSections = async () => {
+        try {
+          const res = await apiClient.get<Section[]>(`/academics/sections?class_id=${selectedClassId}`);
+          setSections(res.data);
+          if (res.data.length > 0) {
+            setSelectedSectionId(res.data[0].id);
+          } else {
+            setSelectedSectionId('');
+          }
+        } catch (err: any) {
+          console.error('Failed to load sections for attendance:', err);
+          setSections([]);
           setSelectedSectionId('');
         }
-      } catch (err: any) {
-        console.error('Failed to load sections for attendance:', err);
-      }
-    };
-    fetchSections();
-  }, [selectedClassId]);
+      };
+      fetchSections();
+    }
+  }, [selectedClassId, classes]);
 
   // Load Daily Attendance Register
   const loadDailyRegister = useCallback(async () => {

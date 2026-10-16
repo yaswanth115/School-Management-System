@@ -92,6 +92,26 @@ def add_section(
     return AcademicService.create_section(db, class_id, section_in)
 
 
+@router.get("/sections", response_model=List[SectionResponse])
+def get_sections(
+    class_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Retrieve sections, optionally filtered by class_id."""
+    return AcademicService.list_sections(db, class_id=class_id)
+
+
+@router.get("/classes/{class_id}/sections", response_model=List[SectionResponse])
+def get_class_sections(
+    class_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Retrieve sections belonging to a specific class."""
+    return AcademicService.list_sections(db, class_id=class_id)
+
+
 # --- Subjects ---
 @router.get("/subjects", response_model=List[SubjectResponse])
 def get_subjects(

@@ -105,6 +105,13 @@ class AcademicService:
         db.refresh(section)
         return section
 
+    @staticmethod
+    def list_sections(db: Session, class_id: Optional[UUID] = None) -> List[Section]:
+        query = db.query(Section).filter(Section.is_active.is_(True))
+        if class_id:
+            query = query.filter(Section.class_id == class_id)
+        return query.order_by(Section.name).all()
+
     # --- Subjects ---
     @staticmethod
     def list_subjects(db: Session) -> List[Subject]:
