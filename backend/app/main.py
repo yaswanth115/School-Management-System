@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1.router import api_router
@@ -56,3 +56,16 @@ def root():
         "docs": f"{settings.API_V1_STR}/docs",
         "health": "/health",
     }
+
+
+@app.get("/docs", include_in_schema=False)
+def redirect_to_docs():
+    """Convenience redirect from /docs to /api/v1/docs."""
+    return RedirectResponse(url=f"{settings.API_V1_STR}/docs")
+
+
+@app.get("/redoc", include_in_schema=False)
+def redirect_to_redoc():
+    """Convenience redirect from /redoc to /api/v1/redoc."""
+    return RedirectResponse(url=f"{settings.API_V1_STR}/redoc")
+
