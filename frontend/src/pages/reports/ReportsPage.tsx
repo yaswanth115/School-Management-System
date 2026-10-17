@@ -7,9 +7,9 @@ import {
   DollarSign,
   Award,
   CalendarCheck,
-  TrendingUp,
-  AlertCircle,
   Filter,
+  CheckCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { Card } from '../../components/ui/Card';
@@ -44,8 +44,8 @@ export const ReportsPage: React.FC = () => {
   const [examReport, setExamReport] = useState<ExaminationPerformanceReport | null>(null);
 
   // Attendance Data
-  const [attendanceStartDate, setAttendanceStartDate] = useState('');
-  const [attendanceEndDate, setAttendanceEndDate] = useState('');
+  const [attendanceMonth, setAttendanceMonth] = useState<number | ''>('');
+  const [attendanceYear, setAttendanceYear] = useState<number | ''>('');
   const [attendanceReport, setAttendanceReport] = useState<AttendanceAnalyticsReport | null>(null);
 
   useEffect(() => {
@@ -62,6 +62,7 @@ export const ReportsPage: React.FC = () => {
       const res = await apiClient.get<StudentDemographicsReport>('/reports/students');
       setDemographics(res.data);
     } catch (err: any) {
+      console.error('Failed to load demographics report:', err);
       setError(err.response?.data?.detail || 'Failed to load demographics report.');
     } finally {
       setIsLoading(false);
@@ -75,6 +76,7 @@ export const ReportsPage: React.FC = () => {
       const res = await apiClient.get<FinancialSummaryReport>('/reports/finances');
       setFinances(res.data);
     } catch (err: any) {
+      console.error('Failed to load financial report:', err);
       setError(err.response?.data?.detail || 'Failed to load financial report.');
     } finally {
       setIsLoading(false);
@@ -85,18 +87,21 @@ export const ReportsPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const examsRes = await apiClient.get<Exam[]>('/examinations');
-      setExamsList(examsRes.data);
+      const examsRes = await apiClient.get<Exam[]>('/exams');
+      setExamsList(examsRes.data || []);
 
-      const targetId = selectedExamId || (examsRes.data.length > 0 ? examsRes.data[0].id : '');
+      const targetId = selectedExamId || (examsRes.data && examsRes.data.length > 0 ? examsRes.data[0].id : '');
       if (targetId) {
         setSelectedExamId(targetId);
         const repRes = await apiClient.get<ExaminationPerformanceReport>(
           `/reports/examinations?exam_id=${targetId}`
         );
         setExamReport(repRes.data);
+      } else {
+        setExamReport(null);
       }
     } catch (err: any) {
+      console.error('Failed to load examination reports:', err);
       setError(err.response?.data?.detail || 'Failed to load examination reports.');
     } finally {
       setIsLoading(false);
@@ -105,6 +110,10 @@ export const ReportsPage: React.FC = () => {
 
   const handleExamChange = async (examId: string) => {
     setSelectedExamId(examId);
+    if (!examId) {
+      setExamReport(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const repRes = await apiClient.get<ExaminationPerformanceReport>(
@@ -123,11 +132,12 @@ export const ReportsPage: React.FC = () => {
     setError(null);
     try {
       let url = '/reports/attendance?';
-      if (attendanceStartDate) url += `start_date=${attendanceStartDate}&`;
-      if (attendanceEndDate) url += `end_date=${attendanceEndDate}&`;
+      if (attendanceMonth) url += `month=${attendanceMonth}&`;
+      if (attendanceYear) url += `year=${attendanceYear}&`;
       const res = await apiClient.get<AttendanceAnalyticsReport>(url);
       setAttendanceReport(res.data);
     } catch (err: any) {
+      console.error('Failed to load attendance report:', err);
       setError(err.response?.data?.detail || 'Failed to load attendance report.');
     } finally {
       setIsLoading(false);
@@ -215,8 +225,8 @@ export const ReportsPage: React.FC = () => {
               variant="primary"
               onClick={() => {
                 let url = '/reports/attendance?export=csv&';
-                if (attendanceStartDate) url += `start_date=${attendanceStartDate}&`;
-                if (attendanceEndDate) url += `end_date=${attendanceEndDate}&`;
+                if (attendanceMonth) url += `month=${attendanceMonth}&`;
+                if (attendanceYear) url += `year=${attendanceYear}&`;
                 downloadCsv(url, 'attendance_analytics.csv');
               }}
               leftIcon={<Download className="w-4 h-4" />}
@@ -259,140 +269,198 @@ export const ReportsPage: React.FC = () => {
       ) : (
         <div className="space-y-6 printable-report">
           {/* 1. Demographics Tab */}
-          {activeTab === 'DEMOGRAPHICS' && demographics && (
+          {activeTab === 'DEMOGRAPHICS' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="bg-indigo-50/50 border-indigo-100">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase">Total Enrolled</p>
-                  <p className="text-3xl font-extrabold text-slate-900 mt-2">{demographics.total_students}</p>
-                  <p className="text-xs text-slate-500 mt-1">Across all registered classes</p>
-                </Card>
+              {demographics ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="bg-indigo-50/50 border-indigo-100">
+                      <p className="text-xs font-semibold text-indigo-600 uppercase">Total Enrolled</p>
+                      <p className="text-3xl font-extrabold text-slate-900 mt-2">{demographics.total_students}</p>
+                      <p className="text-xs text-slate-500 mt-1">Across all registered classes</p>
+                    </Card>
 
-                <Card className="bg-purple-50/50 border-purple-100">
-                  <p className="text-xs font-semibold text-purple-600 uppercase">Gender Ratio</p>
-                  <div className="flex items-center gap-3 mt-2 text-sm font-bold text-slate-800">
-                    <span>M: {demographics.gender_distribution['MALE'] || 0}</span>
-                    <span>•</span>
-                    <span>F: {demographics.gender_distribution['FEMALE'] || 0}</span>
-                    {demographics.gender_distribution['OTHER'] ? (
-                      <>
+                    <Card className="bg-purple-50/50 border-purple-100">
+                      <p className="text-xs font-semibold text-purple-600 uppercase">Gender Ratio</p>
+                      <div className="flex items-center gap-3 mt-2 text-sm font-bold text-slate-800">
+                        <span>
+                          Male: {demographics.gender_distribution?.Male ?? demographics.gender_distribution?.MALE ?? 0}
+                        </span>
                         <span>•</span>
-                        <span>O: {demographics.gender_distribution['OTHER']}</span>
-                      </>
-                    ) : null}
+                        <span>
+                          Female: {demographics.gender_distribution?.Female ?? demographics.gender_distribution?.FEMALE ?? 0}
+                        </span>
+                        {(demographics.gender_distribution?.Other ?? demographics.gender_distribution?.OTHER) ? (
+                          <>
+                            <span>•</span>
+                            <span>
+                              Other: {demographics.gender_distribution?.Other ?? demographics.gender_distribution?.OTHER ?? 0}
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Institutional demographic balance</p>
+                    </Card>
+
+                    <Card className="bg-emerald-50/50 border-emerald-100">
+                      <p className="text-xs font-semibold text-emerald-600 uppercase">Enrollment Status</p>
+                      <p className="text-xl font-bold text-slate-900 mt-2">
+                        {demographics.status_distribution
+                          ? Object.entries(demographics.status_distribution)
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(' | ')
+                          : 'All Active'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Student lifecycle distribution</p>
+                    </Card>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Institutional demographic balance</p>
-                </Card>
 
-                <Card className="bg-emerald-50/50 border-emerald-100">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase">Enrollment Status</p>
-                  <p className="text-xl font-bold text-slate-900 mt-2">
-                    {Object.entries(demographics.status_distribution)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(' | ') || 'All Active'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">Student lifecycle distribution</p>
-                </Card>
-              </div>
-
-              {/* Class-wise enrollment breakdown table */}
-              <Card title="Class-Wise Enrollment Breakdown" subtitle="Distribution across active class sections">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
-                        <th className="py-3 px-4">Class</th>
-                        <th className="py-3 px-4">Section</th>
-                        <th className="py-3 px-4 text-right">Student Count</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {demographics.class_enrollment_counts.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="py-6 text-center text-slate-400 text-xs">
-                            No active class enrollments recorded.
-                          </td>
-                        </tr>
-                      ) : (
-                        demographics.class_enrollment_counts.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-3 px-4 font-semibold text-slate-800">{item.class_name}</td>
-                            <td className="py-3 px-4 text-slate-600">Section {item.section_name}</td>
-                            <td className="py-3 px-4 text-right font-bold text-indigo-600">{item.student_count}</td>
+                  {/* Class-wise enrollment breakdown table */}
+                  <Card title="Class-Wise Enrollment Breakdown" subtitle="Distribution across active class sections">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
+                            <th className="py-3 px-4">Class</th>
+                            <th className="py-3 px-4">Section</th>
+                            <th className="py-3 px-4 text-center">Male</th>
+                            <th className="py-3 px-4 text-center">Female</th>
+                            <th className="py-3 px-4 text-right">Total Count</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(!demographics.class_distribution || demographics.class_distribution.length === 0) ? (
+                            <tr>
+                              <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                                No active class enrollments recorded.
+                              </td>
+                            </tr>
+                          ) : (
+                            demographics.class_distribution.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-semibold text-slate-800">{item.class_name}</td>
+                                <td className="py-3 px-4 text-slate-600">{item.section_name}</td>
+                                <td className="py-3 px-4 text-center text-slate-600">{item.male ?? 0}</td>
+                                <td className="py-3 px-4 text-center text-slate-600">{item.female ?? 0}</td>
+                                <td className="py-3 px-4 text-right font-bold text-indigo-600">{item.total}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+
+                  {/* Student Master Roster */}
+                  {demographics.students && demographics.students.length > 0 && (
+                    <Card title={`Enrolled Students Directory (${demographics.students.length})`} subtitle="Full student records summary">
+                      <div className="overflow-x-auto max-h-96">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50 sticky top-0">
+                              <th className="py-2.5 px-3">Admission No</th>
+                              <th className="py-2.5 px-3">Student Name</th>
+                              <th className="py-2.5 px-3">Class & Section</th>
+                              <th className="py-2.5 px-3">Gender</th>
+                              <th className="py-2.5 px-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-xs">
+                            {demographics.students.map((st, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">{st.admission_number}</td>
+                                <td className="py-2.5 px-3 font-medium text-slate-800">{st.full_name}</td>
+                                <td className="py-2.5 px-3 text-slate-600">{st.class_name} ({st.section_name})</td>
+                                <td className="py-2.5 px-3 text-slate-600">{st.gender}</td>
+                                <td className="py-2.5 px-3">
+                                  <Badge variant="emerald">{st.status}</Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-sm">No demographics data available.</div>
+              )}
             </div>
           )}
 
           {/* 2. Finances & Defaulters Tab */}
-          {activeTab === 'FINANCES' && finances && (
+          {activeTab === 'FINANCES' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <Card>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Total Invoiced</p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">₹{finances.total_invoiced.toLocaleString()}</p>
-                </Card>
-                <Card className="bg-emerald-50/40 border-emerald-100">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase">Total Collected</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">₹{finances.total_collected.toLocaleString()}</p>
-                </Card>
-                <Card className="bg-red-50/40 border-red-100">
-                  <p className="text-xs font-semibold text-red-600 uppercase">Total Outstanding</p>
-                  <p className="text-2xl font-bold text-red-600 mt-1">₹{finances.total_outstanding.toLocaleString()}</p>
-                </Card>
-                <Card className="bg-indigo-50/40 border-indigo-100">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase">Collection Rate</p>
-                  <p className="text-2xl font-bold text-indigo-600 mt-1">{finances.collection_rate_percentage}%</p>
-                </Card>
-              </div>
+              {finances ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <Card>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Total Invoiced</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1">₹{finances.total_invoiced.toLocaleString()}</p>
+                    </Card>
+                    <Card className="bg-emerald-50/40 border-emerald-100">
+                      <p className="text-xs font-semibold text-emerald-600 uppercase">Total Collected</p>
+                      <p className="text-2xl font-bold text-emerald-600 mt-1">₹{finances.total_collected.toLocaleString()}</p>
+                    </Card>
+                    <Card className="bg-red-50/40 border-red-100">
+                      <p className="text-xs font-semibold text-red-600 uppercase">Total Outstanding</p>
+                      <p className="text-2xl font-bold text-red-600 mt-1">₹{finances.total_outstanding.toLocaleString()}</p>
+                    </Card>
+                    <Card className="bg-indigo-50/40 border-indigo-100">
+                      <p className="text-xs font-semibold text-indigo-600 uppercase">Collection Rate</p>
+                      <p className="text-2xl font-bold text-indigo-600 mt-1">{finances.collection_percentage}%</p>
+                    </Card>
+                  </div>
 
-              {/* Defaulters Ledger */}
-              <Card
-                title={`Fee Defaulters & Unpaid Invoices (${finances.defaulters.length})`}
-                subtitle="Students with overdue and outstanding fees"
-              >
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
-                        <th className="py-3 px-4">Student</th>
-                        <th className="py-3 px-4">Admission No.</th>
-                        <th className="py-3 px-4">Class</th>
-                        <th className="py-3 px-4">Due Date</th>
-                        <th className="py-3 px-4 text-right">Balance Due</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {finances.defaulters.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="py-6 text-center text-emerald-600 text-xs font-semibold">
-                            ✓ No outstanding fee defaulters. All billing accounts settled!
-                          </td>
-                        </tr>
-                      ) : (
-                        finances.defaulters.map((d, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-3 px-4 font-semibold text-slate-800">{d.student_name}</td>
-                            <td className="py-3 px-4 text-slate-600 font-mono text-xs">{d.admission_number}</td>
-                            <td className="py-3 px-4 text-slate-600">{d.class_name}</td>
-                            <td className="py-3 px-4 text-slate-500 text-xs">
-                              {d.due_date ? new Date(d.due_date).toLocaleDateString() : 'N/A'}
-                            </td>
-                            <td className="py-3 px-4 text-right font-bold text-red-600">
-                              ₹{d.balance_amount.toLocaleString()}
-                            </td>
+                  {/* Defaulters Ledger */}
+                  <Card
+                    title={`Fee Defaulters & Overdue Invoices (${finances.defaulters?.length || 0})`}
+                    subtitle="Students with outstanding fee balances"
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
+                            <th className="py-3 px-4">Student</th>
+                            <th className="py-3 px-4">Admission No.</th>
+                            <th className="py-3 px-4">Class</th>
+                            <th className="py-3 px-4">Invoice No</th>
+                            <th className="py-3 px-4">Due Date</th>
+                            <th className="py-3 px-4 text-right">Balance Due</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(!finances.defaulters || finances.defaulters.length === 0) ? (
+                            <tr>
+                              <td colSpan={6} className="py-6 text-center text-emerald-600 text-xs font-semibold">
+                                ✓ No outstanding fee defaulters. All billing accounts settled!
+                              </td>
+                            </tr>
+                          ) : (
+                            finances.defaulters.map((d, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-semibold text-slate-800">{d.student_name}</td>
+                                <td className="py-3 px-4 text-slate-600 font-mono text-xs">{d.admission_number}</td>
+                                <td className="py-3 px-4 text-slate-600">{d.class_name}</td>
+                                <td className="py-3 px-4 text-slate-500 font-mono text-xs">{d.invoice_number || 'N/A'}</td>
+                                <td className="py-3 px-4 text-slate-500 text-xs">
+                                  {d.due_date ? new Date(d.due_date).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="py-3 px-4 text-right font-bold text-red-600">
+                                  ₹{d.balance_amount.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-sm">No financial data available.</div>
+              )}
             </div>
           )}
 
@@ -408,193 +476,236 @@ export const ReportsPage: React.FC = () => {
                     onChange={(e) => handleExamChange(e.target.value)}
                     className="rounded-lg border border-slate-300 py-1.5 px-3 text-sm focus:outline-none focus:border-indigo-500"
                   >
-                    {examsList.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
+                    {examsList.length === 0 ? (
+                      <option value="">No examinations configured</option>
+                    ) : (
+                      examsList.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
                 {examReport && (
                   <div className="flex items-center gap-4 text-xs">
                     <span className="text-slate-600">
-                      Total Marks Records: <strong className="text-slate-900">{examReport.total_marks_recorded}</strong>
+                      Evaluated Students: <strong className="text-slate-900">{examReport.total_students_evaluated}</strong>
                     </span>
                     <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-bold">
-                      Overall Average: {examReport.overall_average_percentage}%
+                      Overall Pass Rate: {examReport.overall_pass_percentage}%
                     </span>
                   </div>
                 )}
               </div>
 
-              {examReport && (
+              {examReport ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Subject-Wise Performance */}
-                  <Card title="Subject Performance" subtitle="Average, highest, and lowest mark benchmarks">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
-                            <th className="py-3 px-4">Subject</th>
-                            <th className="py-3 px-4 text-center">Avg %</th>
-                            <th className="py-3 px-4 text-right">Max</th>
-                            <th className="py-3 px-4 text-right">Min</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {examReport.subject_performance.map((s, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50">
-                              <td className="py-3 px-4 font-semibold text-slate-800">{s.subject_name}</td>
-                              <td className="py-3 px-4 text-center font-bold text-indigo-600">
-                                {s.average_percentage}%
-                              </td>
-                              <td className="py-3 px-4 text-right text-emerald-600 font-medium">{s.highest_mark}</td>
-                              <td className="py-3 px-4 text-right text-red-500 font-medium">{s.lowest_mark}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-
                   {/* Class-Wise Performance */}
-                  <Card title="Class-Wise Average" subtitle="Aggregated evaluation across classes">
+                  <Card title="Class-Wise Average Scores" subtitle="Aggregated evaluation across classes">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm">
                         <thead>
                           <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
                             <th className="py-3 px-4">Class</th>
-                            <th className="py-3 px-4 text-center">Students Evaluated</th>
+                            <th className="py-3 px-4 text-center">Evaluated</th>
                             <th className="py-3 px-4 text-right">Class Average</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {examReport.class_performance.map((c, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50">
-                              <td className="py-3 px-4 font-semibold text-slate-800">{c.class_name}</td>
-                              <td className="py-3 px-4 text-center text-slate-600">{c.students_evaluated}</td>
-                              <td className="py-3 px-4 text-right font-bold text-indigo-600">
-                                {c.average_percentage}%
+                          {(!examReport.class_averages || examReport.class_averages.length === 0) ? (
+                            <tr>
+                              <td colSpan={3} className="py-6 text-center text-slate-400 text-xs">
+                                No class averages recorded for this exam.
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            examReport.class_averages.map((c, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-semibold text-slate-800">{c.class_name}</td>
+                                <td className="py-3 px-4 text-center text-slate-600">{c.students_evaluated}</td>
+                                <td className="py-3 px-4 text-right font-bold text-indigo-600">
+                                  {c.average_percentage}%
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
                   </Card>
+
+                  {/* Top Performers */}
+                  <Card title="Top Performing Students" subtitle="Merit benchmark leaders">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
+                            <th className="py-3 px-4">Rank</th>
+                            <th className="py-3 px-4">Student</th>
+                            <th className="py-3 px-4">Class</th>
+                            <th className="py-3 px-4 text-right">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(!examReport.top_performers || examReport.top_performers.length === 0) ? (
+                            <tr>
+                              <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
+                                No top performers recorded yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            examReport.top_performers.map((p, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-bold text-amber-600">#{idx + 1}</td>
+                                <td className="py-3 px-4 font-semibold text-slate-800">{p.student_name}</td>
+                                <td className="py-3 px-4 text-slate-600">{p.class_name}</td>
+                                <td className="py-3 px-4 text-right font-bold text-emerald-600">{p.percentage}%</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-sm">
+                  {examsList.length === 0 ? 'No exams available.' : 'Select an exam to view results.'}
                 </div>
               )}
             </div>
           )}
 
           {/* 4. Attendance Analytics Tab */}
-          {activeTab === 'ATTENDANCE' && attendanceReport && (
+          {activeTab === 'ATTENDANCE' && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-white border border-slate-200">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-500 uppercase">Date Range:</span>
-                  <input
-                    type="date"
-                    value={attendanceStartDate}
-                    onChange={(e) => setAttendanceStartDate(e.target.value)}
+                  <span className="text-xs font-semibold text-slate-500 uppercase">Filters:</span>
+                  <select
+                    value={attendanceMonth}
+                    onChange={(e) => setAttendanceMonth(e.target.value ? Number(e.target.value) : '')}
                     className="text-xs rounded-lg border border-slate-300 py-1.5 px-2.5 focus:outline-none focus:border-indigo-500"
-                  />
-                  <span className="text-slate-400">to</span>
-                  <input
-                    type="date"
-                    value={attendanceEndDate}
-                    onChange={(e) => setAttendanceEndDate(e.target.value)}
+                  >
+                    <option value="">All Months</option>
+                    {[
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December',
+                    ].map((m, idx) => (
+                      <option key={idx + 1} value={idx + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={attendanceYear}
+                    onChange={(e) => setAttendanceYear(e.target.value ? Number(e.target.value) : '')}
                     className="text-xs rounded-lg border border-slate-300 py-1.5 px-2.5 focus:outline-none focus:border-indigo-500"
-                  />
+                  >
+                    <option value="">All Years</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
                   <Button variant="outline" size="sm" onClick={loadAttendanceReport}>
                     Filter
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-slate-500">Total Entries: {attendanceReport.total_records}</span>
-                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold">
-                    Institutional Rate: {attendanceReport.overall_attendance_rate}%
-                  </span>
-                </div>
+                {attendanceReport && (
+                  <div className="text-xs text-slate-500">
+                    Academic Session: <strong className="text-slate-800">{attendanceReport.academic_year_name}</strong>
+                  </div>
+                )}
               </div>
 
-              {/* Status Breakdown Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <Card className="bg-emerald-50/50 border-emerald-100">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase">Present</p>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">
-                    {attendanceReport.status_breakdown['PRESENT'] || 0}
-                  </p>
-                </Card>
-                <Card className="bg-red-50/50 border-red-100">
-                  <p className="text-xs font-semibold text-red-700 uppercase">Absent</p>
-                  <p className="text-2xl font-bold text-red-700 mt-1">
-                    {attendanceReport.status_breakdown['ABSENT'] || 0}
-                  </p>
-                </Card>
-                <Card className="bg-amber-50/50 border-amber-100">
-                  <p className="text-xs font-semibold text-amber-700 uppercase">Late</p>
-                  <p className="text-2xl font-bold text-amber-700 mt-1">
-                    {attendanceReport.status_breakdown['LATE'] || 0}
-                  </p>
-                </Card>
-                <Card className="bg-purple-50/50 border-purple-100">
-                  <p className="text-xs font-semibold text-purple-700 uppercase">Excused</p>
-                  <p className="text-2xl font-bold text-purple-700 mt-1">
-                    {attendanceReport.status_breakdown['EXCUSED'] || 0}
-                  </p>
-                </Card>
-              </div>
-
-              {/* Class-Wise Attendance Rates */}
-              <Card title="Class-Wise Attendance Register Rates" subtitle="Breakdown of section-level attendance percentages">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
-                        <th className="py-3 px-4">Class & Section</th>
-                        <th className="py-3 px-4 text-center">Total Marked</th>
-                        <th className="py-3 px-4 text-center">Present Days</th>
-                        <th className="py-3 px-4 text-right">Attendance Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {attendanceReport.class_wise_rates.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
-                            No attendance records found for this period.
-                          </td>
-                        </tr>
-                      ) : (
-                        attendanceReport.class_wise_rates.map((c, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-3 px-4 font-semibold text-slate-800">
-                              {c.class_name} - Section {c.section_name}
-                            </td>
-                            <td className="py-3 px-4 text-center text-slate-600">{c.total_marked}</td>
-                            <td className="py-3 px-4 text-center text-emerald-600 font-medium">{c.present_count}</td>
-                            <td className="py-3 px-4 text-right">
-                              <span
-                                className={`font-bold px-2 py-0.5 rounded text-xs ${
-                                  c.attendance_rate >= 80
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : c.attendance_rate >= 75
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {c.attendance_rate}%
-                              </span>
-                            </td>
+              {attendanceReport ? (
+                <div className="space-y-6">
+                  {/* Class-Wise Attendance Rates */}
+                  <Card title="Class-Wise Average Attendance" subtitle="Aggregated attendance rate across sections">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
+                            <th className="py-3 px-4">Class & Section</th>
+                            <th className="py-3 px-4 text-center">Registers Taken</th>
+                            <th className="py-3 px-4 text-right">Average Attendance</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(!attendanceReport.class_attendance_summary || attendanceReport.class_attendance_summary.length === 0) ? (
+                            <tr>
+                              <td colSpan={3} className="py-6 text-center text-slate-400 text-xs">
+                                No attendance records found.
+                              </td>
+                            </tr>
+                          ) : (
+                            attendanceReport.class_attendance_summary.map((c, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-semibold text-slate-800">
+                                  {c.class_name} - {c.section_name}
+                                </td>
+                                <td className="py-3 px-4 text-center text-slate-600">{c.total_registers}</td>
+                                <td className="py-3 px-4 text-right">
+                                  <span
+                                    className={`font-bold px-2 py-0.5 rounded text-xs ${
+                                      c.average_attendance_percentage >= 80
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : c.average_attendance_percentage >= 75
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}
+                                  >
+                                    {c.average_attendance_percentage}%
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+
+                  {/* Low Attendance Alerts */}
+                  {attendanceReport.low_attendance_students && attendanceReport.low_attendance_students.length > 0 && (
+                    <Card
+                      title={`Low Attendance Alerts (< 75%) — ${attendanceReport.low_attendance_students.length} Students`}
+                      subtitle="Students requiring institutional counseling or guardian notification"
+                    >
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase bg-slate-50">
+                              <th className="py-2.5 px-3">Admission No</th>
+                              <th className="py-2.5 px-3">Student Name</th>
+                              <th className="py-2.5 px-3">Class</th>
+                              <th className="py-2.5 px-3 text-center">Attendance %</th>
+                              <th className="py-2.5 px-3">Parent Phone</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-xs">
+                            {attendanceReport.low_attendance_students.map((st, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-3 font-mono font-bold text-slate-700">{st.admission_number}</td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-900">{st.student_name}</td>
+                                <td className="py-2.5 px-3 text-slate-600">{st.class_name}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <Badge variant="rose">{st.attendance_percentage}%</Badge>
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">{st.parent_phone || 'N/A'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  )}
                 </div>
-              </Card>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-sm">No attendance analytics recorded.</div>
+              )}
             </div>
           )}
         </div>

@@ -766,60 +766,91 @@ export type DashboardStatsResponse =
   | StudentDashboardStats;
 
 // --- Institutional Reports ---
+export interface ClassDistributionItem {
+  class_name: string;
+  section_name: string;
+  total: number;
+  male?: number;
+  female?: number;
+}
+
+export interface StudentReportItem {
+  admission_number: string;
+  full_name: string;
+  class_name: string;
+  section_name: string;
+  roll_number?: string | null;
+  gender: string;
+  blood_group?: string | null;
+  date_of_birth: string;
+  admission_date: string;
+  status: string;
+}
+
 export interface StudentDemographicsReport {
   total_students: number;
   gender_distribution: Record<string, number>;
+  class_distribution: ClassDistributionItem[];
   status_distribution: Record<string, number>;
-  class_enrollment_counts: {
-    class_name: string;
-    section_name: string;
-    student_count: number;
-  }[];
+  students?: StudentReportItem[];
+}
+
+export interface DefaulterReportItem {
+  student_name: string;
+  admission_number: string;
+  class_name: string;
+  invoice_number?: string | null;
+  title?: string | null;
+  total_amount?: number;
+  paid_amount?: number;
+  balance_amount: number;
+  due_date?: string | null;
+  status?: string;
 }
 
 export interface FinancialSummaryReport {
   total_invoiced: number;
   total_collected: number;
   total_outstanding: number;
-  collection_rate_percentage: number;
-  defaulters: {
-    student_id: string;
-    student_name: string;
-    admission_number: string;
-    class_name: string;
-    balance_amount: number;
-    due_date?: string | null;
-  }[];
+  collection_percentage: number;
+  fee_type_breakdown?: { fee_type_name: string; total_amount: number }[];
+  payment_method_breakdown?: { method: string; total_amount: number; count: number }[];
+  defaulters: DefaulterReportItem[];
 }
 
 export interface ExaminationPerformanceReport {
-  exam_id: string;
   exam_name: string;
-  overall_average_percentage: number;
-  total_marks_recorded: number;
-  subject_performance: {
-    subject_name: string;
-    average_percentage: number;
-    highest_mark: number;
-    lowest_mark: number;
-  }[];
-  class_performance: {
+  total_students_evaluated: number;
+  overall_pass_percentage: number;
+  class_averages: {
     class_name: string;
     average_percentage: number;
     students_evaluated: number;
   }[];
+  top_performers?: {
+    student_name: string;
+    class_name: string;
+    percentage: number;
+  }[];
 }
 
 export interface AttendanceAnalyticsReport {
-  total_records: number;
-  overall_attendance_rate: number;
-  status_breakdown: Record<string, number>;
-  class_wise_rates: {
+  academic_year_name: string;
+  month?: number | null;
+  year?: number | null;
+  class_attendance_summary: {
     class_name: string;
     section_name: string;
-    total_marked: number;
-    present_count: number;
-    attendance_rate: number;
+    total_registers: number;
+    average_attendance_percentage: number;
+  }[];
+  low_attendance_students?: {
+    student_name: string;
+    admission_number: string;
+    class_name: string;
+    attendance_percentage: number;
+    parent_phone?: string | null;
   }[];
 }
+
 
